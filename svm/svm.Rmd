@@ -1,0 +1,236 @@
+---
+title: "svm"
+author: "zilani"
+date: "16 October 2018"
+
+output: 
+    html_document:
+      theme: flatly 
+      highlight: tango
+      toc: true
+      toc_float: true
+---
+
+<style>
+h3 {
+  color: white;
+  background-color: #44546a;
+  text-indent: auto; 
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Library
+```{r}
+# load the required library
+library(class)
+library(ISLR)
+library(MASS)
+library(caret)
+library(e1071)
+library(caTools)
+set.seed(101)
+library(mlbench)
+source("functions_w6.R")
+```
+
+**#########################################################################################**
+
+# svm using iris 
+**### test train split and build the model ----------------------------------------------**
+
+
+```{r}
+# load the iris data set for svm
+set.seed(1)
+head(iris)
+
+# test train split of the iris data using catools library
+library(caTools)
+sample <- sample.split(iris$Species, SplitRatio = .70)
+trainiris <- subset(iris, sample == TRUE)
+testiris <- subset(iris, sample == FALSE)
+
+# make the svm model on the training data using 10 fold cross validation
+model<-svm(Species~., data=trainiris, cross = 10, gamma = 0.5, cost = 1)
+summary(model)
+
+```
+
+
+**### looking for the best tune-----------------------------------------------------------**
+
+```{r}
+# Tune for combos of gamma 0.5,1,2
+# and costs 1/10 , 10 , 100
+#tune.results <- tune(svm,train.x=iris[1:4],train.y=iris[,5],kernel='radial',
+                 # ranges=list(cost=10^(-1:2), gamma=c(.5,1,2)))
+
+#summary(tune.results)
+
+# which mean we already used best parameter
+```
+
+
+```{r}
+# predection using the test data
+pred <- predict(model,testiris)
+table(pred,testiris$Species)
+```
+
+**#########################################################################################**
+
+# svm using Loan data
+
+**#### test train split and build the model(loan data)**
+
+
+```{r}
+# exploratory data analysis
+loans<-read.csv('loan_data.csv')
+#str(df)
+#summary(df)
+
+loans$credit.policy <- factor(loans$credit.policy)
+loans$inq.last.6mths <- factor(loans$inq.last.6mths)
+loans$delinq.2yrs <- factor(loans$delinq.2yrs)
+loans$pub.rec <- factor(loans$pub.rec)
+loans$not.fully.paid <- factor(loans$not.fully.paid)
+
+str(loans)
+```
+
+```{r}
+
+# train test split of 70/30
+spl = sample.split(loans$not.fully.paid, 0.7)
+trainloans = subset(loans, spl == TRUE)
+testloans = subset(loans, spl == FALSE)
+
+# build the svm model on train data
+model <- svm(not.fully.paid ~ .,data=trainloans, cross = 10, gamma = 0.1, cost = 1 )
+summary(model)
+
+
+```
+
+```{r}
+
+# predection on the test data and confusion matrix on targeted columm
+predicted.values <- predict(model,testloans[1:13])
+table(predicted.values,testloans$not.fully.paid)
+```
+
+```{r}
+# tune for best gamma and cost function
+#tune.results <- tune(svm,train.x=not.fully.paid~., data=trainloans,kernel='radial',
+                  #ranges=list(cost=c(1,10), gamma=c(0.1,1)))
+
+#summary(tune.results)
+```
+
+**#########################################################################################**
+
+# svm (Ionosphere) data
+
+
+```{r}
+# upload data upload the data file
+data(Ionosphere)
+head(Ionosphere)
+df<-Ionosphere
+
+# structure of data file
+str(df)
+
+mydat <- Ionosphere[,-35]
+mycls <- Ionosphere[,35]
+```
+
+```{r}
+# svm with linear karnal
+# make the svm model on the training data using 10 fold cross validation
+model.linear<-svm(Class~., data=df[,3:35], kernel="linear", cross = 10, gamma = 0.5, cost = 1)
+summary(model.linear)
+
+# put the accuricy of 10 folds into a data frame
+df1<-model.linear$accuracies
+m1 <- matrix(df1, ncol=1, byrow=FALSE)
+accuricy.linear<- as.data.frame(m1, stringsAsFactors=FALSE)
+
+
+```
+
+
+```{r}
+
+# polinomial carnel with degree 2
+model.poly<-svm(Class~., data=df[,3:35], kernel="polynomial", degree=2,cross = 10, gamma = 0.5, cost = 1)
+summary(model.poly)
+
+# polinomial carnel with degree 3
+model.poly<-svm(Class~., data=df[,3:35], kernel="polynomial", degree=3,cross = 10, gamma = 0.5, cost = 1)
+summary(model.poly)
+
+# polinomial carnel with degree 4
+model.poly<-svm(Class~., data=df[,3:35], kernel="polynomial", degree=4,cross = 10, gamma = 0.5, cost = 1)
+summary(model.poly)
+
+```
+
+
+```{r}
+# svm with radial basis karnal
+# make the svm model on the training data using 10 fold cross validation
+model.radial<-svm(Class~., data=df[,3:35], kernel="radial", cross = 10, gamma = 0.5, cost = 1)
+summary(model.radial)
+
+```
+
+**#### (2) Benchmark your classification accuracy using 10-fold cross-validation.-------------------------**
+
+```{r}
+set.seed(1)
+df <- Ionosphere
+df$V1 <- as.numeric(df$V1)
+df <- df[,-2]
+df <- df[,-1]
+
+datafold <- df
+
+# apply 10-fold cross-validation
+fold <- createFolds(datafold$Class, k=10)
+
+
+svm.line.TP <- svm.line.TN <- svm.line.FP <- svm.line.FN <- c()
+
+for(i in 1:length(fold)){
+    # true label for fold i
+    truth <- datafold$Class[fold[[i]]]
+        #liner
+    svm.line <- svm( datafold[-fold[[i]],-33],y=datafold[-fold[[i]],33], kernel="linear", 
+                     type="C-classification", scale=FALSE,cross=10,probability = TRUE)
+    preds <- predict(svm.line,datafold[fold[[i]],-33], probability = TRUE)
+    svm.line.TP <- c(svm.line.TP, sum((truth == preds)[truth == "good"]))
+    svm.line.TN <- c(svm.line.TN, sum((truth == preds)[truth == "bad"]))
+    svm.line.FP <- c(svm.line.FP, sum((truth != preds)[truth == "bad"]))
+    svm.line.FN <- c(svm.line.FN, sum((truth != preds)[truth == "good"]))
+    
+    #roc3 <- roc(df[, 33], attr(preds, "probabilities")[,"good"])
+    #roc3 <- roc((svm.line,datafold[fold[[i]],-33], attr(preds, "probabilities")[,"good"])
+}
+
+evaluate(svm.line.TN, svm.line.FP, svm.line.TP,svm.line.FN)
+```
+
+
+
+
+
+
+
+
+
