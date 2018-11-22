@@ -1,0 +1,280 @@
+---
+title: "glm"
+author: "zilani"
+date: "16 October 2018"
+
+output: 
+    html_document:
+      theme: flatly 
+      highlight: tango
+      toc: true
+      toc_float: true
+---
+
+<style>
+h3 {
+  color: white;
+  background-color: #44546a;
+  text-indent: auto; 
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Library
+```{r}
+library(ISLR)
+library(MASS)
+library(caret)
+set.seed(1)
+source("functions_w6.R")
+library(e1071)
+library(mlbench)
+library(class)
+
+```
+
+
+**#########################################################################################**
+
+# glm breast-w data 
+
+```{r}
+# read in tab-delimited data file
+breastCancerFull <- read.delim("breast-w.txt", head=TRUE)
+str(breastCancerFull)
+
+```
+
+**#### test train split 80/20 ----------------------------------------------**
+
+```{r}
+# Load the "caret" package. This package is used to partition data, training and test classification models etc.
+library(caret)
+set.seed(1)
+inTrain <- createDataPartition(breastCancerFull$Class, p = .8)[[1]]
+breastCancerTrain <- breastCancerFull[ inTrain, ]
+breastCancerTest  <- breastCancerFull[-inTrain, ]
+```
+
+**#### Build a glm model using all features---------------------------------- **
+
+```{r}
+# Notice that we used the training set of the data to training this and the above two logistic regression models.
+set.seed(1)
+logisticRegFull <- train(Class ~ .,
+                     data = breastCancerTrain,
+                     method = "glm",
+                     trControl = trainControl(method = "repeatedcv", 
+                                              repeats = 5))
+
+logisticRegFull
+summary(logisticRegFull)
+# Using $ sign to extract the model selected by our "trControl" procedure and print its information
+logisticRegFull$finalModel
+```
+
+**#### Prediction on the test set -----------------------------------------------------**
+
+```{r}
+# Create prediction function that takes in a logistic regression model and extract some prediction information from this model on predicting test set and subsequently return these prediction information.
+PredictFunc <- function(logisticReg) {
+  breastCancerResults <- data.frame(obs = breastCancerTest$Class)
+  breastCancerResults$prob <- predict(logisticReg, breastCancerTest, type = "prob")[, "malignant"]
+  breastCancerResults$pred <- predict(logisticReg, breastCancerTest)
+  breastCancerResults$Label <- ifelse(breastCancerResults$obs == "malignant", 
+                              "True Outcome: malignant", 
+                              "True Outcome: benign")
+  return(breastCancerResults)
+}
+
+# Now use the three models that we created above to perform classification on the test set of the data. 
+
+breastCancerResultsFull <- PredictFunc(logisticRegFull)
+```
+
+
+**#### Prediction results visualization -------------------------------------------------**
+
+```{r probability of malignancy, fig.align='center',fig.width=9,fig.height=15}
+# First, let us plot the probability of malignancy
+library(gridExtra)
+
+hist3 <- histogram(~prob|Label, data = breastCancerResultsFull, layout = c(2, 1), nint = 20, xlab = "Probability of malignancy",
+          type = "count", main="LogisticRegFull")
+grid.arrange(hist3, nrow=3)
+
+# Now, create the confusion matrix from the test set.
+
+confusionMatrix(data = breastCancerResultsFull$pred, 
+                reference = breastCancerResultsFull$obs)
+```
+
+
+**#########################################################################################**
+
+# glm (Sonar) data
+
+**#### using 10 fold cross Validation ----------------------------------------------**
+```{r}
+
+data(Sonar)
+dim(Sonar)
+
+# create cross validation folds
+library(caret)
+set.seed(1)
+fold <- createFolds(Sonar$Class, k=10)
+
+# apply 10-fold cross-validation
+
+glm.TP <- glm.TN <- glm.FP <- glm.FN <- c()
+
+for(i in 1:length(fold)){
+    # true label for fold i
+    truth <- Sonar$Class[fold[[i]]]
+    
+    # apply GLM for classification (Generalised linear model)
+    glm.model <- glm(Class~., data=Sonar[-fold[[i]],], family = "binomial")
+    #pred.probs <- predict(glm.model, newdata=df[fold[[i]],-10])$posterior[,"M"]
+    pred.probs <- predict(glm.model, newdata=Sonar[fold[[i]],-61], type = "response")
+    
+    preds <- ifelse(pred.probs > 0.5, "M", "R")
+    glm.TP <- c(glm.TP, sum((truth == preds)[truth == "M"]))
+    glm.TN <- c(glm.TN, sum((truth == preds)[truth == "R"]))
+    glm.FP <- c(glm.FP, sum((truth != preds)[truth == "R"]))
+    glm.FN <- c(glm.FN, sum((truth != preds)[truth == "M"]))
+    
+}
+print('')
+print("glm evaluation")
+evaluate(glm.TN, glm.FP, glm.TP, glm.FN)
+```
+
+
+**#########################################################################################**
+
+# glm (Ionosphere) data
+
+**#### using 10 fold cross Validation ----------------------------------------------**
+
+
+```{r}
+data(Ionosphere)
+df <- Ionosphere
+df <- df[,-2]
+df <- df[,-1]
+
+
+# apply 10-fold cross-validation
+fold <- createFolds(df$Class, k=10)
+
+lda.TP <- lda.TN <- lda.FP <- lda.FN <- c()
+
+for(i in 1:length(fold)){
+
+    # true label for fold i
+    truth <- df$Class[fold[[i]]]
+    
+    lda.model <- lda(Class~., data=df)
+    
+        # apply GLM for classification (Generalised linear model)
+    glm.model <- glm(Class~., data=df[-fold[[i]],], family = "binomial")
+    #pred.probs <- predict(glm.model, newdata=df[fold[[i]],-10])$posterior[,"M"]
+    pred.probs <- predict(glm.model, newdata=df[fold[[i]],-33], type = "response")
+    
+   # pred.probs <- predict(lda.model, newdata=df[fold[[i]],-33])$posterior[,"good"]
+    preds <- ifelse(pred.probs > 0.5, "good", "bad")
+
+    lda.TP <- c(lda.TP, sum((truth == preds)[truth == "good"]))
+    lda.TN <- c(lda.TN, sum((truth == preds)[truth == "bad"]))
+    lda.FP <- c(lda.FP, sum((truth != preds)[truth == "bad"]))
+    lda.FN <- c(lda.FN, sum((truth != preds)[truth == "good"]))
+ 
+}
+evaluate(lda.TN, lda.FP, lda.TP,lda.FN)
+
+```
+
+
+**#########################################################################################**
+
+# logistic in titanic data
+
+**#### get the data ----------------------------------------------**
+
+```{r}
+# read the table from web
+library(titanic)
+
+# data exploration
+df.train<-titanic_train
+df.test<-titanic_test
+str(df.train)
+dim(df.train)
+dim(df.test)
+str(df.test)
+# table of surbved or not
+table(df.train$Survived)
+head(df.train)
+```
+
+```{r}
+# factor convert on some variable
+
+df.train[,c('Sex','Cabin')] <- lapply(df.train[,c('Sex','Cabin')],as.factor)
+
+# factor convert on some variable
+
+df.test[,c('Sex','Cabin')] <- lapply(df.test[,c('Sex','Cabin')],as.factor)
+str(df.train)
+
+#df.train<-df.train[-c(3,8,10,12)]
+
+```
+
+```{r}
+#str(df.train)
+#df.train$<-df.train[-c(3,8,10,12)]
+df.train$Name<-NULL
+df.train$Ticket<-NULL
+df.train$Cabin<-NULL
+#df.train$Parch<-NULL
+#df.train$SibSp<-NULL
+
+df.test$Name<-NULL
+df.test$Ticket<-NULL
+df.test$Cabin<-NULL
+#df.test$Parch<-NULL
+#df.test$SibSp<-NULL
+
+str(df.train)
+str(df.test)
+```
+
+
+
+```{r}
+# make the model
+
+model<-glm(Survived~., family = binomial(link=logit), data=df.train)
+summary(model)
+```
+
+```{r}
+# predection on the test data
+prob<-predict(model,df.test, type="response")
+
+pred=rep(0,nrow(df.test))
+pred[prob>.5]=1
+table(pred)
+
+```
+
+
+
+
+
+
