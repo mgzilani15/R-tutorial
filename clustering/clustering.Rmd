@@ -1,0 +1,375 @@
+---
+title: "clustering"
+author: "zilani"
+date: "16 October 2018"
+
+output: 
+    html_document:
+      theme: flatly 
+      highlight: tango
+      toc: true
+      toc_float: true
+---
+
+<style>
+h3 {
+  color: white;
+  background-color: #44546a;
+  text-indent: auto; 
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# library for clustering algorithm
+
+** LIBRARY **
+```{r, warning=FALSE, message=FALSE}
+# library for clustering algorithm
+
+library(limma)
+library(gplots)
+library(e1071)
+library(shiny)
+library(clValid)
+library(ClueR) 
+library(cluster) 
+library(factoextra)
+library(fclust)
+library(ppclust)
+```
+
+
+**#########################################################################################**
+
+# kmean clustering(iris) 
+
+
+**#### Data (iris)**
+```{r}
+# using the iris data set explain the k mean clustering
+head(iris)
+
+
+# putting the iris data into ir for doing experiment
+# in the ir last colum making null cos we make the cluster based on other feature on the ir data set
+ir<-iris
+ir$Species<-NULL
+head(ir)
+
+# scale the data
+ir <- scale(ir, center = T, scale = T)
+```
+
+```{r}
+
+# based on all the feature kmeans clustering algorithm been applying
+# the description is below
+# 3 cluster without knowing the algorithm the real lebels
+res<-kmeans(ir,3)
+res
+```
+
+**#### ploting the cluster with the label data and cluster (iris)-------------**
+```{r}
+# plot them according to the cluster
+# this is based on our made cluster
+iris<-iris
+plot(iris[c("Petal.Length", "Petal.Width")], col=res$cluster)
+
+# how is the cluster in the original data set
+# so both of the fig almost same, so we did a good job though
+plot(iris[c("Petal.Length", "Petal.Width")], col=iris$Species)
+
+```
+
+**## Evaluation (iris data in kmean clustering)**
+**this can be treated as a accuricy table of clustering , since clustring is unsupervised learning technique it dont have a target variable to validate the model. perform K-means clustering using R. Clustering is a unsupervised learning algorithm used when the data is unlabeled in nature. k mean clustering is very sensitive in outlier that mean some data point is be missclassified, so if we can remove the outlier its performance can be good.**
+
+```{r}
+# a tabluer comparison of species and cluster made by R
+# versicolor 48 in one cluster but 2 in cluster one so thats a mistake
+# same as verginica 14 mistake
+
+# this can be treated as a accuricy table of clustering , since clustring is unsupervised learning technique it dont have a target variable to validate the model. perform K-means clustering using R. Clustering is a unsupervised learning algorithm used when the data is unlabeled in nature. k mean clustering is very sensitive in outlier that mean some data point is be missclassified, so if we can remove the outlier its performance can be good. 
+
+table(iris$Species,res$cluster)
+```
+
+
+**#########################################################################################**
+
+# cmean clustering(iris)
+
+
+**#### c mean clustering (iris data)---------------------**
+
+```{r}
+# c mean clustering using 3 cluster
+library(e1071)
+ir <- scale(ir, center = T, scale = T)
+cm1<-cmeans (ir, centers=3, m=2)
+
+# ploting/showing the cmean clustering
+fuzzPlot(ir,cm1, mfrow = c(3,3))
+
+```
+
+**#### evaluation table cmean clustering iris data -------------------**
+```{r}
+# c mean clustering evaluation with the original lebel
+
+table(iris$Species,cm1$cluster)
+```
+
+
+**#### Clustering results validation iris data clvalid method-----------------**
+
+```{r}
+#install.packages("clvalid")
+# clValid is a package that containing various cluster validation methods
+
+library(clValid) 
+intern <- clValid(ir, nClust=2:10, validation="internal", clMethods=c("hierarchical","kmeans", "pam"))
+summary(intern)
+optimalScores(intern)
+
+# set up plots
+plot(intern)
+```
+
+
+## stability based metrics
+**The stability measures evaluate the stability of a clustering result by comparing it with the clusters obtained by removing one column at a time. These measures include the average proportion of non-overlap (APN), the average distance (AD), the average distance between means (ADM), and the figure of merit (FOM). The APN, AD, and ADM are all based on the cross-classification table of the original clustering with the clustering based on the removal of one column. The APN measures the average proportion of observations not placed in the same cluster under both cases, while the AD measures the average distance between observations placed in the same cluster under both cases and the ADM measures the average distance between cluster centers for observations placed in the same cluster under both cases. The FOM measures the average intra-cluster variance of the deleted column, where the clustering is based on the remaining (undeleted) columns. In all cases the average is taken over all the deleted columns, and all measures should be minimized.**
+
+**## validating cluster iris data stability method**
+```{r, warning=FALSE, fig.width=10, fig.height=10}
+
+
+par(mfrow=c(2,2))
+stab <- clValid(ir[,-5], nClust=2:10, validation="stability", clMethods=c("hierarchical", "kmeans", "pam"))
+optimalScores(stab)
+plot(stab)
+```
+
+
+
+**#########################################################################################**
+
+# hc cluster(iris)
+
+
+**# hierarchical clustering (iris data)**
+
+**In contrast to the K-means clustering in which we need to explicitly provide how many clusters are we expecting from the data, we do not need to provide such a thing here.**
+
+```{r}
+# here also we gonna use our ir data set
+
+hc_avarage=hclust(dist(ir),method="average")
+hc_single=hclust(dist(ir),method="single")
+hc_complete=hclust(dist(ir),method="complete")
+plot(hc_avarage)
+plot(hc_single)
+plot(hc_complete)
+
+hc_complete
+hc_avarage
+hc_single
+```
+
+**## Tree cutting in Heirarical clustering (iris data)**
+
+```{r}
+
+# cutting the tree into 3 cluster
+cut<-cutree(hc_complete,3)
+
+# show the cut
+cut
+
+# plot the cut
+plot(cut)
+```
+
+
+**## cross validation in the dandogram as  we have some lebel here in (iris) data**
+
+```{r}
+# cus is the dendogram with 3 tree comparing with original
+table(cut, iris$Species)
+```
+
+
+
+**#########################################################################################**
+
+# hc cluster(mtcar)
+
+
+```{r}
+#mtcars<-mtcars mtcar data set
+# distance matrics
+head(mtcars)
+d<-dist(mtcars)
+```
+
+```{r}
+# clustering algorithhm in the distance matrics
+c<-hclust(d)
+# call the  hclustering
+c
+
+# plot the hclustering
+plot(c)
+
+# cut the tree in to 3 cluster
+g<-cutree(c, k=3)
+
+# making ractangle in the tree c of 2 cluster
+rect.hclust(c, k=2, border="blue")
+
+# making ractangle in the tree c of 3 cluster
+rect.hclust(c, k=3, border="red")
+```
+
+```{r}
+# plot the g (tree cut)
+g
+
+# cutting the tree into the range of clusters
+gr<-cutree(c, k=2:5)
+gr
+
+```
+
+
+**#########################################################################################**
+
+# clustering(wine data) 
+
+
+**# Some more clustering using wine data set:**
+
+**Usually when dealing with an unsupervised learning problem, its difficult to get a good measure of how well the model performed. For this project, we will use data from the UCI archive based off of red and white wines (this is a very commonly used data set in ML)**
+
+```{r}
+# read the table from UCI
+
+redwine = read.table("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv", header= TRUE, sep = ";", dec = ".")
+whitewine=read.table("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv", header= TRUE, sep = ";", dec = ".")
+```
+
+
+```{r}
+# ADDING EXTRA LEBEL IN THE END OF THE FILE WHICH WILL USE USE FOR FUTURE EVALUATION
+
+
+redwine[,13]<-'red'
+whitewine[,13]<-'white'
+```
+
+
+```{r}
+#Combine both data file into a single data frame called wine.
+
+wine <- rbind(redwine,whitewine)
+
+#str(wine)
+```
+
+
+**# k mean clustering (wine data) -----------------------------------**
+```{r}
+# APPLYING THE K MEAN CLUSTERING ALGORITHM WITHOUT INFORMING THE ALGORITHM THE NAME OF THE LABEL
+# WE USING TWO CLUSTER HERE
+
+wine.cluster <- kmeans(wine[1:12],2)
+#wine.cluster
+
+```
+
+```{r}
+wine.cluster$centers
+```
+
+**## cluster Evaluation (k mean wine data)----------------------------------**
+```{r}
+# now lets see how the algorithm is working while known lebel was comparing
+# red wine classified well
+
+table(wine$V13,wine.cluster$cluster)
+```
+
+**## Fuzzy cmean clustering in wine data-------------------------------**
+```{r}
+library(e1071)
+tempwine<-wine[,1:11]
+fc <- cmeans(wine[,1:11], centers=3)
+```
+
+**## Visualise the clustering results using ClueR package function "fuzzPlot" as follows:**
+```{r}
+tempwine <- scale(tempwine[,1:11], center = T, scale = T)
+fuzzPlot(tempwine, fc, mfrow = c(3, 3))
+```
+
+
+**## Clustering results validation(wine data in stability method)**
+
+```{r}
+# making the last colum of the table as null to make all colum as numeric
+#9% data in random since the data size is so big for this iteration, using dplyr only selected this random 
+# data for clustering validation
+library(dplyr)
+wine$v13<-NULL
+wine$quality<-NULL
+tempwine<-sample_frac(wine[,1:11], size = 0.09)
+str(tempwine)
+
+```
+
+
+```{r}
+library(clValid)
+#par(mfrow=c(2,2))
+stab <- clValid(tempwine[,-5], nClust=2:10, validation=c("stability", "internal"), clMethods=c("hierarchical", "kmeans", "pam"))
+optimalScores(stab)
+plot(stab)
+```
+
+```{r}
+# Calculate Dunn's index: dunn_km. Print it.
+# dun index vs number of k in the wine data
+library(clValid)
+
+k.vec <- c()
+dunn.vec <- c();
+
+
+for (k in 2:12) {
+  
+    wine_km <- kmeans(wine[,1:11], k, nstart = 20)
+    
+    dunn_km = dunn(clusters = wine_km$cluster, Data=wine)
+    dunn.vec <-append(dunn.vec, dunn_km)
+    k.vec <- append(k.vec, k)
+}
+plot(k.vec, dunn.vec, type="b", xlab="k", ylab="Dunn Index", main="Dunn Index vs Number of clusters (k) in kmeans clustering")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
